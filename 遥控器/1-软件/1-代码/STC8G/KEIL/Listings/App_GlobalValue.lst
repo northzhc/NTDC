@@ -1,0 +1,56 @@
+C51 COMPILER V9.00   APP_GLOBALVALUE                                                       07/21/2020 16:23:55 PAGE 1   
+
+
+C51 COMPILER V9.00, COMPILATION OF MODULE APP_GLOBALVALUE
+OBJECT MODULE PLACED IN .\Objects\App_GlobalValue.obj
+COMPILER INVOKED BY: d:\Keil_v5\C51\BIN\C51.EXE ..\APP\App_GlobalValue.c OPTIMIZE(8,SPEED) BROWSE INCDIR(..\APP;..\BSP;.
+                    -.\PUB;..\STC8G;..\MOD) DEBUG OBJECTEXTEND PRINT(.\Listings\App_GlobalValue.lst) OBJECT(.\Objects\App_GlobalValue.obj)
+
+line level    source
+
+   1          #include "App_GlobalValue.h"
+   2          #include "Bsp_Stc8gEeprom.h"
+   3          #include "string.h"
+   4          
+   5          xdata RfData_T gst_RfRecData;//接受到的数据
+   6          
+   7          xdata SystemPara_T gst_SystemPara;//系统参数
+   8          
+   9          
+  10          /**
+  11           *************************************************************************
+  12           * @brief: App_GlobalValue_Init
+  13           * @param: void
+  14           * @return: void
+  15           * @function:
+  16           * @author: 
+  17           * @version: V1.0
+  18           * @note:
+  19           *************************************************************************
+  20          **/
+  21          void App_GlobalValue_Init(void)
+  22          {
+  23   1              gst_RfRecData.ul_RemoteCtlAddr = 0;//遥控地址
+  24   1              gst_RfRecData.uch_KeyNum = 0;//按键值
+  25   1              gst_SystemPara.uch_RemoteCtlSavedNum = 0;//已经录了遥控器0个
+  26   1              gst_SystemPara.uch_SystemStatus = IDLE;//空闲
+  27   1              gst_SystemPara.ul_TimeCount = 0;//持续时间清0
+  28   1              gst_SystemPara.uch_RemoteCtlPressSta = NO_PRESS;//没遥控器按键按下
+  29   1              gst_SystemPara.uch_RemoteCtlTrgType = DOT_TRG;//点动模式
+  30   1              ReadPara_Eeprom();//读取参数
+  31   1      }
+  32          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     47    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =     37    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

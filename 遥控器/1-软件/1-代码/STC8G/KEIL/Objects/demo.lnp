@@ -1,0 +1,12 @@
+".\Objects\App_Main.obj",
+".\Objects\App_GlobalValue.obj",
+".\Objects\Bsp_Stc8gGpio.obj",
+".\Objects\Bsp_Stc8gTimer.obj",
+".\Objects\Bsp_Stc8gUart.obj",
+".\Objects\Bsp_Stc8gClock.obj",
+".\Objects\Bsp_Stc8gEeprom.obj",
+".\Objects\Mod_Syn480r.obj",
+".\Objects\Mod_Button.obj",
+".\Objects\Pub_Delay.obj" 
+TO ".\Objects\demo" 
+PRINT(".\Listings\demo.m51") RAMSIZE(256) 

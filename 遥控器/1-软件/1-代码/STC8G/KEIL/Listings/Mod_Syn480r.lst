@@ -1,0 +1,328 @@
+C51 COMPILER V9.00   MOD_SYN480R                                                           07/21/2020 16:23:56 PAGE 1   
+
+
+C51 COMPILER V9.00, COMPILATION OF MODULE MOD_SYN480R
+OBJECT MODULE PLACED IN .\Objects\Mod_Syn480r.obj
+COMPILER INVOKED BY: d:\Keil_v5\C51\BIN\C51.EXE ..\MOD\Mod_Syn480r.c OPTIMIZE(8,SPEED) BROWSE INCDIR(..\APP;..\BSP;..\PU
+                    -B;..\STC8G;..\MOD) DEBUG OBJECTEXTEND PRINT(.\Listings\Mod_Syn480r.lst) OBJECT(.\Objects\Mod_Syn480r.obj)
+
+line level    source
+
+   1          #include "Mod_Syn480r.h"
+   2          #include "Bsp_Stc8gEeprom.h"
+   3          #include "App_GlobalValue.h"
+   4          #include "Bsp_Stc8gUart.h"
+   5          
+   6          /*
+   7          我们可以设定一个较快的定时中断（下面设定24us），
+   8          然后在中调用接收解码函数，每次中断只判断相应的标志，
+   9          不会造成中断执行时间过长的问题。
+  10          
+  11          比如其中一对收发模块，同步码为10ms低电平，之后是25位数据，
+  12          只取24位3个字节，"1"是1.1ms高+0.2ms低, "0"是0.45高+0.9低，
+  13          所以可以只通过高电平判断，下面是具体的程序，需要注意的是各回调函数中不能执行太久，
+  14          最好是设置标志就好了：
+  15          */
+  16          
+  17          INT8U    uch_RfRxStep;                //IR接收步骤
+  18          INT16U   uin_RfRxCnt;                //接收计数器
+  19           
+  20          INT32U   gul_RfRxData;            //接收数据暂存，//同步码之后是25位数据，只取24位3个字节
+  21          
+  22          //INT8U    uch_RfRxData1;                //接收数据--//客户代码1
+  23          //INT8U    uch_RfRxData2;                //客户代码2 
+  24          //INT8U    uch_RfRxData3;                //数据码
+  25          
+  26           
+  27           
+  28          INT8U    uch_RfRxLevel;
+  29          INT8U    uch_RfRxBitCnt;                //接收数据位
+  30          BOOL     b_RfRecOkFlag;            //收到完整的24位数据置1，相当于g_bitKeyDownFlag
+  31          //BOOL     b_RfRecEndCodeFlag;        //收到结束码
+  32          INT8U    uch_TimerCount;
+  33          INT8U    uch_RfRxKeeppingMsCnt;        //接收第一个数据后开始的计数器
+  34          //INT8U    uch_RfRxKeeppingIntervalCount;
+  35          // 
+  36          //BOOL     b_ResetFlag;
+  37          
+  38          /**
+  39           *************************************************************************
+  40           * @brief: Mod_Syn480r_Init
+  41           * @param: void
+  42           * @return: void
+  43           * @function:
+  44           * @author: 
+  45           * @version: V1.0
+  46           * @note:
+  47           *************************************************************************
+  48          **/
+  49          void Mod_Syn480r_Init(void)
+  50          {
+  51   1              RF433M_Init();
+  52   1              RF_PIN = 1;//置1再读
+  53   1              
+  54   1      }
+C51 COMPILER V9.00   MOD_SYN480R                                                           07/21/2020 16:23:56 PAGE 2   
+
+  55          /**
+  56            *************************************************************************
+  57            * @brief: RF433M_Init
+  58            * @param: void
+  59            * @return: void
+  60            * @function:接收初始化函数
+  61            * @author: 
+  62            * @version: V1.0
+  63            * @note:
+  64            *************************************************************************
+  65           **/ 
+  66          void RF433M_Init(void)
+  67          {
+  68   1          uch_RfRxStep = 0;
+  69   1          b_RfRecOkFlag = FALSE;
+  70   1          //b_RfRecEndCodeFlag = FALSE;
+  71   1              uch_TimerCount = 0;
+  72   1       
+  73   1      }    
+  74          
+  75          /**
+  76            *************************************************************************
+  77            * @brief: RF433M_OnRecevieFirstData
+  78            * @param: void
+  79            * @return: void
+  80            * @function:
+  81            * @author: 
+  82            * @version: V1.0
+  83            * @note:第一次收到完整的24位数据的回调函数
+  84                            相当于按键按下调用函数 -- OnkeyDown()
+  85                            只在开始的时候进一次
+  86            *************************************************************************
+  87           **/ 
+  88          void RF433M_OnRecevieFirstData(void)
+  89          {
+  90   1          uch_RfRxKeeppingMsCnt = 0; 
+  91   1      }
+  92          /**
+  93            *************************************************************************
+  94            * @brief: RF433M_OnRecevieData
+  95            * @param: void
+  96            * @return: void
+  97            * @function:
+  98            * @author: 
+  99            * @version: V1.0
+ 100            * @note:收到完整的24位数据后的回调函数 
+ 101                            相当于按键按下调用函数 -- OnkeyPressing()
+ 102                            在按下期间，会不断进入
+ 103            *************************************************************************
+ 104           **/ 
+ 105          void RF433M_OnRecevieData(void)
+ 106          {
+ 107   1          if(uch_RfRxKeeppingMsCnt >= C_DELAY_KEY_PRESS_LONG)
+ 108   1          {
+ 109   2              //接受错误
+ 110   2              if(gst_RfRecData.ul_RemoteCtlAddr == 0)
+ 111   2              {
+ 112   3                      return;
+ 113   3              }
+ 114   2                      //只要当空闲的时候才可以切换到接受状态
+ 115   2                  if(gst_SystemPara.uch_SystemStatus == IDLE)
+ 116   2                      {
+C51 COMPILER V9.00   MOD_SYN480R                                                           07/21/2020 16:23:56 PAGE 3   
+
+ 117   3                      gst_SystemPara.uch_SystemStatus = RECV;//切换到接受解析
+ 118   3                      gst_SystemPara.uch_RemoteCtlPressSta = LONG_PRESS;//长按
+ 119   3              }
+ 120   2              //uch_RfRxKeeppingMsCnt = 0;
+ 121   2          }
+ 122   1      }
+ 123          
+ 124          /**
+ 125            *************************************************************************
+ 126            * @brief: RF433M_OnRecevieEndCode
+ 127            * @param: void
+ 128            * @return: void
+ 129            * @function:
+ 130            * @author: 
+ 131            * @version: V1.0
+ 132            * @note:      收到24位数据后，再接收到结束码的回调函数
+ 133                                  相当于按键按下松开时调用函数 -- OnkeyUp()
+ 134            *************************************************************************
+ 135           **/ 
+ 136          void RF433M_OnRecevieEndCode(void) 
+ 137          {
+ 138   1          if(uch_RfRxKeeppingMsCnt <= C_DELAY_KEY_PRESS_SHORT) 
+ 139   1          {
+ 140   2              //接收错误
+ 141   2              if(gst_RfRecData.ul_RemoteCtlAddr == 0)
+ 142   2              {
+ 143   3                      return;
+ 144   3              }
+ 145   2                       //只要当空闲的时候才可以切换到接受状态
+ 146   2              if(gst_SystemPara.uch_SystemStatus == IDLE)
+ 147   2              {
+ 148   3                      gst_SystemPara.uch_SystemStatus = RECV;//切换到接受解析
+ 149   3                      gst_SystemPara.uch_RemoteCtlPressSta = SHORT_PRESS;//短按
+ 150   3              }
+ 151   2                      //uch_RfRxKeeppingMsCnt = 0;    
+ 152   2          }
+ 153   1      }
+ 154           
+ 155          /**
+ 156          *************************************************************************
+ 157          * @brief: RF433M_RecevieDecode
+ 158          * @param: void
+ 159          * @return: void
+ 160          * @function:433接收解码函数
+ 161          * @author: 
+ 162          * @version: V1.0
+ 163          * @note:在24us定时中断中调用433M接收解码函数
+ 164                          同步码，10ms低电平
+ 165                          之后是25位数据，只取24位3个字节
+ 166                          "1"是1.1ms高+0.2ms低, "0"是0.45高+0.9低
+ 167                          所以可以只通过高电平判断
+ 168          *************************************************************************
+ 169          **/
+ 170          void RF433M_RecevieDecode(void)
+ 171          {
+ 172   1              uch_TimerCount++;
+ 173   1          if(uch_TimerCount == 42) //1ms=42*24us
+ 174   1          {
+ 175   2              uch_TimerCount = 0;
+ 176   2              uch_RfRxKeeppingMsCnt++;
+ 177   2          } 
+ 178   1              /*
+C51 COMPILER V9.00   MOD_SYN480R                                                           07/21/2020 16:23:56 PAGE 4   
+
+ 179   1              if(uin_RfRxCnt > C_RF_START_L_MIN)//判断杂波
+ 180   1              {
+ 181   1                      uch_RfRxBitCnt = 0;
+ 182   1                      gul_RfRxData = 0;
+ 183   1                      return;
+ 184   1              }*/
+ 185   1          switch(uch_RfRxStep)
+ 186   1          {
+ 187   2              case    0:
+ 188   2                  if(!RF_PIN)//低电平
+ 189   2                  {
+ 190   3                      //1-1.开始检测引导码10ms低电平或结束码100ms低电平
+ 191   3                      uin_RfRxCnt = 0;
+ 192   3                      uch_RfRxStep = 1;
+ 193   3                  }     
+ 194   2                  break;
+ 195   2              case    1: 
+ 196   2                  if(!RF_PIN) 
+ 197   2                  { 
+ 198   3                      //1-2.引导码10ms或结束码100ms低电平计时
+ 199   3                      uin_RfRxCnt++; 
+ 200   3                  }
+ 201   2                  else
+ 202   2                  {     
+ 203   3                      //1-3.判断引导码9ms低电平或结束码100ms低电平 
+ 204   3                      if((uin_RfRxCnt > C_RF_END_L_MIN) && b_RfRecOkFlag) 
+ 205   3                      { 
+ 206   4                          //结束码 
+ 207   4                          b_RfRecOkFlag = FALSE; 
+ 208   4                          //相当于按键按下松开时调用函数 -- OnkeyUp() 
+ 209   4                          RF433M_OnRecevieEndCode(); 
+ 210   4                          return ; 
+ 211   4                      } 
+ 212   3                      else if((uin_RfRxCnt > C_RF_START_L_MAX) || (uin_RfRxCnt < C_RF_START_L_MIN)) 
+ 213   3                      { 
+ 214   4                          goto F_RfRxError;             
+ 215   4                      }
+ 216   3                      //引导码             
+ 217   3                      //b_RfRecOkFlag = 0;
+ 218   3                      //2-1.开始接收数据，检测引导码4.5ms高电平     
+ 219   3                      uch_RfRxLevel = RF_PIN; 
+ 220   3                      uin_RfRxCnt = 0; 
+ 221   3                      uch_RfRxBitCnt = 0; 
+ 222   3                      uch_RfRxStep = 2; 
+ 223   3                      //gul_RfRxData = 0;
+ 224   3                  } 
+ 225   2                  break;
+ 226   2              case    2://check level change 
+ 227   2                  if(RF_PIN == uch_RfRxLevel) 
+ 228   2                  { 
+ 229   3                      //电平保持不变 
+ 230   3                      uin_RfRxCnt++; 
+ 231   3                  } 
+ 232   2                  else 
+ 233   2                  {    //level change,check current level
+ 234   3                      uch_RfRxLevel = RF_PIN; 
+ 235   3                      if(!RF_PIN) 
+ 236   3                      {     
+ 237   4                          //数据0、1是通过高电平时间判断，所以电平跳变为低的时候， 
+ 238   4                          //也就获取到高电平的时间了， 
+ 239   4                          //就可以判断有效数据0,1
+ 240   4                          gul_RfRxData = gul_RfRxData << 1; 
+C51 COMPILER V9.00   MOD_SYN480R                                                           07/21/2020 16:23:56 PAGE 5   
+
+ 241   4                          //"1"是1.1ms高+0.2ms低, "0"是0.45高+0.9低 
+ 242   4                          //所以可以只通过高电平判断,当然用低电平判断也一样类似 
+ 243   4                          if((uin_RfRxCnt < C_RF_DATA1_MAX) && (uin_RfRxCnt > C_RF_DATA1_MIN)) 
+ 244   4                          {//data 1 
+ 245   5                              //set1 gul_RfRxData.0; 
+ 246   5                              gul_RfRxData |= 1 << 0;
+ 247   5                              goto F_RfRxCheckBit; 
+ 248   5                          }     
+ 249   4                          else if((uin_RfRxCnt < C_RF_DATA0_MAX) && (uin_RfRxCnt > C_RF_DATA0_MIN)) 
+ 250   4                          {//data 0 
+ 251   5                              //set0 gul_RfRxData.0; 
+ 252   5                              gul_RfRxData &= ~(1 << 0);
+ 253   5                              goto F_RfRxCheckBit;                     
+ 254   5                          } 
+ 255   4                          else 
+ 256   4                          { 
+ 257   5                              goto F_RfRxError; 
+ 258   5                          }
+ 259   4      F_RfRxError: 
+ 260   4                          uch_RfRxStep = 0;                 
+ 261   4                          return;
+ 262   4      F_RfRxCheckBit: 
+ 263   4                          uch_RfRxBitCnt++; 
+ 264   4                          if(uch_RfRxBitCnt >= C_RF_REC_BIT_LEN) 
+ 265   4                          {    
+ 266   5                                                      //接收完成,设置收到数据标志 
+ 267   5      //                        uch_RfRxData3 = gew_RfRxData $ 0;    //数据码
+ 268   5      //                        uch_RfRxData2 = gew_RfRxData $ 1;    //客户代码
+ 269   5      //                        uch_RfRxData1 = gew_RfRxData $ 2;    //客户代码
+ 270   5      
+ 271   5                                                      gst_RfRecData.ul_RemoteCtlAddr = gul_RfRxData >> 4;//遥控器地址
+ 272   5                                                      gst_RfRecData.uch_KeyNum = gul_RfRxData & 0x000F;//遥控器按键值
+ 273   5      
+ 274   5                                                      
+ 275   5                              //b_RfRecEndCodeFlag = FALSE; 
+ 276   5                              uch_RfRxStep = 0; 
+ 277   5                              uch_RfRxBitCnt=0; 
+ 278   5                              if(!b_RfRecOkFlag) 
+ 279   5                              { 
+ 280   6                                  b_RfRecOkFlag = TRUE;; 
+ 281   6                                  //这时候相当于按键的OnkeyDown() 
+ 282   6                                  RF433M_OnRecevieFirstData(); 
+ 283   6                              } 
+ 284   5                              //这时候相当于按键的OnkeyPressing() 
+ 285   5                              RF433M_OnRecevieData(); 
+ 286   5                          } 
+ 287   4                      } 
+ 288   3                      uin_RfRxCnt = 0; 
+ 289   3                  } 
+ 290   2                  break; 
+ 291   2          }
+ 292   1      }
+ 293          
+ 294          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    415    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     11    ----
+C51 COMPILER V9.00   MOD_SYN480R                                                           07/21/2020 16:23:56 PAGE 6   
+
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      1    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

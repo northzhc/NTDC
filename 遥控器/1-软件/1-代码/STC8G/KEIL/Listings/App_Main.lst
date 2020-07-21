@@ -1,0 +1,429 @@
+C51 COMPILER V9.00   APP_MAIN                                                              07/21/2020 16:23:55 PAGE 1   
+
+
+C51 COMPILER V9.00, COMPILATION OF MODULE APP_MAIN
+OBJECT MODULE PLACED IN .\Objects\App_Main.obj
+COMPILER INVOKED BY: d:\Keil_v5\C51\BIN\C51.EXE ..\APP\App_Main.c OPTIMIZE(8,SPEED) BROWSE INCDIR(..\APP;..\BSP;..\PUB;.
+                    -.\STC8G;..\MOD) DEBUG OBJECTEXTEND PRINT(.\Listings\App_Main.lst) OBJECT(.\Objects\App_Main.obj)
+
+line level    source
+
+   1          #include "App_Main.h"
+   2          
+   3          /*
+   4          --------------------|--------------------|-----------------------
+   5           KEY/LED <<<< P5.4  |                    |P3.3 INT1  >>>>>输出1
+   6          --------------------|                    |-----------------------
+   7                           VCC    |       SOP8         |P3.2 INT0  >>>>>输出2
+   8          --------------------|                    |-----------------------
+   9              DATA <<<< P5.5  |     STC8G1K08      |P3.1 TXD   >>>>>输出3
+  10          --------------------|                    |-----------------------
+  11                            GNG   |                    |P3.0 RXD   >>>>>输出4
+  12          --------------------|--------------------|-----------------------
+  13          */
+  14          
+  15          void main(void)
+  16          {       
+  17   1              //Bsp_Stc8gClock_Init();//系统时钟初始化
+  18   1              Bsp_Stc8gGpio_Init();//GPIO初始化
+  19   1              Bsp_Stc8gTimer_Init();//定时器初始化
+  20   1              Bsp_Stc8gUart_Init();//串口初始化
+  21   1              Bsp_Stc8gEeprom_Init();//EEPROM初始化
+  22   1              
+  23   1              App_GlobalValue_Init();//全局变量初始化
+  24   1              
+  25   1              Mod_Syn480r_Init();//433接收初始化
+  26   1              Mod_Button_Init();//按键初始化
+  27   1              //Eeprom_Test();//EEPROM读写测试
+  28   1              
+  29   1              while(1)
+  30   1              {
+  31   2                      
+  32   2      //              Uart_SendString("hello\r\n", 7);
+  33   2                      App_Process();//流程处理
+  34   2              }
+  35   1      }
+  36          /**
+  37           *************************************************************************
+  38           * @brief: App_Process
+  39           * @param: void
+  40           * @return: void
+  41           * @function:
+  42           * @author: 
+  43           * @version: V1.0
+  44           * @note: 空闲 -> 配置 -> 接收 -> 错误
+  45           *************************************************************************
+  46          **/
+  47          void App_Process(void)
+  48          {
+  49   1              switch(gst_SystemPara.uch_SystemStatus)//判断系统状态
+  50   1              {
+  51   2                      case IDLE://空闲
+  52   2                      {
+  53   3                              if(gst_SystemPara.ul_TimeCount >= MAX_BUTTONSCANF_TIME)//到了按键扫描时间
+  54   3                              {
+C51 COMPILER V9.00   APP_MAIN                                                              07/21/2020 16:23:55 PAGE 2   
+
+  55   4                                      gst_SystemPara.ul_TimeCount = 0;
+  56   4                                      Button_Process();//按键处理
+  57   4                              }
+  58   3                              break;
+  59   3                      }
+  60   2                      case RECV://接受
+  61   2                      {
+  62   3                              RemoteCtl_Process();//遥控器接受处理
+  63   3                              if(gst_SystemPara.uch_RemoteCtlTrgType == DOT_TRG)//若为点动模式，大于1.5s后电平
+  64   3                              {
+  65   4                                      if(gst_SystemPara.ul_TimeCount >= MAX_PORTHIGH_TIME)//大于高电平持续时间
+  66   4                                      {
+  67   5                                              RF_KEY1_PIN = RF_KEY2_PIN = RF_KEY3_PIN = RF_KEY4_PIN = 0;//清除端口状态                
+  68   5                                              gst_RfRecData.ul_RemoteCtlAddr = 0;//清除接受到的遥控器ID
+  69   5                                              gst_RfRecData.uch_KeyNum = 0;//清除接受到的按键值
+  70   5                                              gst_SystemPara.uch_SystemStatus = IDLE;//切换到系统空闲
+  71   5                                      }       
+  72   4                              }
+  73   3                              else
+  74   3                              {       
+  75   4                                      gst_RfRecData.ul_RemoteCtlAddr = 0;//清除接受到的遥控器ID
+  76   4                                      gst_RfRecData.uch_KeyNum = 0;//清除接受到的按键值
+  77   4                                      gst_SystemPara.uch_SystemStatus = IDLE;//切换到系统空闲
+  78   4                              }
+  79   3                              break;
+  80   3                      }
+  81   2                      case CONFIG://配置
+  82   2                      {
+  83   3                              if(gst_RfRecData.ul_RemoteCtlAddr != 0)//有遥控器按下
+  84   3                              {
+  85   4                                      if(SavePara_Eeprom(REMOTECTL_ADDR))//保存遥控器地址参数OK
+  86   4                                      {
+  87   5                                              BUTTON_PIN = 1;//配置成功 LED熄灭
+  88   5                                              gst_SystemPara.uch_SystemStatus = IDLE;//系统空闲
+  89   5                                      }
+  90   4                                      else//保存失败
+  91   4                                      {       
+  92   5                                              gst_SystemPara.uch_SystemStatus = ERROR;//系统错误
+  93   5                                      }
+  94   4                              }
+  95   3                              else
+  96   3                              {                               
+  97   4                                      BUTTON_PIN = !BUTTON_PIN;//配置模式 LED快闪
+  98   4                                      Delay_Ms(100);
+  99   4                                      if(gst_SystemPara.ul_TimeCount >= MAX_CONFIGLAST_TIME)//到了最长配置时间，退出配置模式
+ 100   4                                      {
+ 101   5                                              BUTTON_PIN = 1;//退出配置 LED熄灭
+ 102   5                                              gst_SystemPara.uch_SystemStatus = IDLE;//切换到系统空闲
+ 103   5                                      }
+ 104   4      
+ 105   4                              }
+ 106   3                              break;
+ 107   3                      }
+ 108   2                      case ERROR://错误
+ 109   2                      {
+ 110   3                              TR0 = 0;//关闭定时器0，不进行正常的解码
+ 111   3                              BUTTON_PIN = 0;//LED常亮
+ 112   3                              Uart_SendString("SYSTEM ERROR\r\n", 14);//串口输出系统出现错误
+ 113   3                              break;
+ 114   3                      }
+ 115   2                      default:
+ 116   2                              break;
+C51 COMPILER V9.00   APP_MAIN                                                              07/21/2020 16:23:55 PAGE 3   
+
+ 117   2              }
+ 118   1      }
+ 119          /**
+ 120           *************************************************************************
+ 121           * @brief: RemoteCtl_Process
+ 122           * @param: void
+ 123           * @return: void
+ 124           * @function:遥控器接受处理函数
+ 125           * @author: 
+ 126           * @version: V1.0
+ 127           * @note: 按键按下端口状态保持1.5s
+ 128           *************************************************************************
+ 129          **/
+ 130          void RemoteCtl_Process(void)
+ 131          {                       
+ 132   1      
+ 133   1              INT8U i;
+ 134   1              switch(gst_SystemPara.uch_RemoteCtlPressSta)
+ 135   1              {
+ 136   2                      case SHORT_PRESS://短按
+ 137   2                      case LONG_PRESS://长按
+ 138   2                      {
+ 139   3                              //判断ADDR是否一样
+ 140   3                              for(i = 0; i < gst_SystemPara.uch_RemoteCtlSavedNum; i++)
+ 141   3                              {
+ 142   4                                      //判断接受到的地址是否与存储的地址相等
+ 143   4                                      if(gst_RfRecData.ul_RemoteCtlAddr == gst_SystemPara.aul_RemoteCtlAddr[i])
+ 144   4                                      {
+ 145   5                                              RemoteCtlOutput_Config();//根据设置类型输出
+ 146   5                                      }
+ 147   4                              }
+ 148   3                              gst_SystemPara.uch_RemoteCtlPressSta = NO_PRESS;//清除按下状态
+ 149   3                              break;
+ 150   3                      }
+ 151   2                      case NO_PRESS://没按下
+ 152   2                      {
+ 153   3                              break;
+ 154   3                      }
+ 155   2                      default:
+ 156   2                              break;
+ 157   2              }
+ 158   1      }
+ 159          /**
+ 160           *************************************************************************
+ 161           * @brief: RemoteCtlOutput_Config
+ 162           * @param: void
+ 163           * @return: void
+ 164           * @function: 遥控器输出配置
+ 165           * @author: 
+ 166           * @version: V1.0
+ 167           * @note: 翻转 点动 互锁 自锁 串口 五种输出状态配置
+ 168           *************************************************************************
+ 169          **/
+ 170          void RemoteCtlOutput_Config(void)
+ 171          {
+ 172   1              //判断设置的是哪种输出类型
+ 173   1              switch(gst_SystemPara.uch_RemoteCtlTrgType)
+ 174   1              {
+ 175   2                      /*翻转 按下按键对应端口电平取反*/
+ 176   2                      case TURN_OVER://翻转
+ 177   2                      {
+ 178   3                              switch(gst_RfRecData.uch_KeyNum)
+C51 COMPILER V9.00   APP_MAIN                                                              07/21/2020 16:23:55 PAGE 4   
+
+ 179   3                              {
+ 180   4                                      case C_RF_DATA_1_KEY: 
+ 181   4                                      { 
+ 182   5                                              RF_KEY1_PIN = !RF_KEY1_PIN;
+ 183   5                                              break; 
+ 184   5                                      } 
+ 185   4                                      case C_RF_DATA_2_KEY: 
+ 186   4                                      {  
+ 187   5                                              RF_KEY2_PIN = !RF_KEY2_PIN;
+ 188   5                                              break;
+ 189   5                                      } 
+ 190   4                                      case C_RF_DATA_3_KEY: 
+ 191   4                                      {         
+ 192   5                                              RF_KEY3_PIN = !RF_KEY3_PIN;
+ 193   5                                              break; 
+ 194   5                                      }
+ 195   4                                      case C_RF_DATA_4_KEY:
+ 196   4                                      {
+ 197   5                                              RF_KEY4_PIN = !RF_KEY4_PIN;
+ 198   5                                              break; 
+ 199   5                                      }
+ 200   4                                      default:
+ 201   4                                      {
+ 202   5                                              RF_KEY1_PIN = RF_KEY2_PIN = RF_KEY3_PIN = RF_KEY4_PIN = 0;
+ 203   5                                              break;
+ 204   5                                      }
+ 205   4                              }
+ 206   3                              break;
+ 207   3                      }
+ 208   2                      /*自锁 可任意组合键按下， 按下后对应的脚为高*/
+ 209   2                      case SLEF_LOCK://自锁
+ 210   2                      {
+ 211   3                              switch(gst_RfRecData.uch_KeyNum)
+ 212   3                              {
+ 213   4                                      case C_RF_DATA_1_KEY: 
+ 214   4                                      { 
+ 215   5                                              RF_KEY1_PIN = 1;
+ 216   5                                              RF_KEY2_PIN = RF_KEY3_PIN = RF_KEY4_PIN = 0;
+ 217   5                                              break; 
+ 218   5                                      } 
+ 219   4                                      case C_RF_DATA_2_KEY: 
+ 220   4                                      {  
+ 221   5                                              RF_KEY2_PIN = 1;
+ 222   5                                              RF_KEY1_PIN = RF_KEY3_PIN = RF_KEY4_PIN = 0;
+ 223   5                                              break;
+ 224   5                                      } 
+ 225   4                                      case C_RF_DATA_3_KEY: 
+ 226   4                                      {         
+ 227   5                                              RF_KEY3_PIN = 1;
+ 228   5                                              RF_KEY1_PIN = RF_KEY2_PIN = RF_KEY4_PIN = 0;
+ 229   5                                              break; 
+ 230   5                                      }
+ 231   4                                      case C_RF_DATA_4_KEY:
+ 232   4                                      {
+ 233   5                                              RF_KEY4_PIN = 1;
+ 234   5                                              RF_KEY1_PIN = RF_KEY2_PIN = RF_KEY3_PIN = 0;
+ 235   5                                              break; 
+ 236   5                                      }
+ 237   4                                      //两个按键按下
+ 238   4                                      case C_RF_DATA_1_KEY | C_RF_DATA_2_KEY:
+ 239   4                                      {
+ 240   5                                              RF_KEY1_PIN = RF_KEY2_PIN = 1;
+C51 COMPILER V9.00   APP_MAIN                                                              07/21/2020 16:23:55 PAGE 5   
+
+ 241   5                                              RF_KEY3_PIN = RF_KEY4_PIN = 0;
+ 242   5                                              break;
+ 243   5                                      }
+ 244   4                                      case C_RF_DATA_1_KEY | C_RF_DATA_3_KEY:
+ 245   4                                      {
+ 246   5                                              RF_KEY1_PIN = RF_KEY3_PIN = 1;
+ 247   5                                              RF_KEY2_PIN = RF_KEY4_PIN = 0;
+ 248   5                                              break;
+ 249   5                                      }
+ 250   4                                      case C_RF_DATA_1_KEY | C_RF_DATA_4_KEY:
+ 251   4                                      {
+ 252   5                                              RF_KEY1_PIN = RF_KEY4_PIN = 1;
+ 253   5                                              RF_KEY2_PIN = RF_KEY3_PIN = 0;
+ 254   5                                              break;
+ 255   5                                      }
+ 256   4                                      case C_RF_DATA_2_KEY | C_RF_DATA_3_KEY:
+ 257   4                                      {
+ 258   5                                              RF_KEY2_PIN = RF_KEY3_PIN = 1;
+ 259   5                                              RF_KEY1_PIN = RF_KEY4_PIN = 0;
+ 260   5                                              break;
+ 261   5                                      }
+ 262   4                                      case C_RF_DATA_2_KEY | C_RF_DATA_4_KEY:
+ 263   4                                      {
+ 264   5                                              RF_KEY2_PIN = RF_KEY4_PIN = 1;
+ 265   5                                              RF_KEY1_PIN = RF_KEY3_PIN = 0;
+ 266   5                                              break;
+ 267   5                                      }
+ 268   4                                      case C_RF_DATA_3_KEY | C_RF_DATA_4_KEY:
+ 269   4                                      {
+ 270   5                                              RF_KEY3_PIN = RF_KEY4_PIN = 1;
+ 271   5                                              RF_KEY1_PIN = RF_KEY2_PIN = 0;
+ 272   5                                              break;
+ 273   5                                      }
+ 274   4                                      //三个按键
+ 275   4                                      case C_RF_DATA_1_KEY | C_RF_DATA_2_KEY | C_RF_DATA_3_KEY:
+ 276   4                                      {
+ 277   5                                              RF_KEY1_PIN = RF_KEY2_PIN = RF_KEY3_PIN = 1;
+ 278   5                                              RF_KEY4_PIN = 0;
+ 279   5                                              break;
+ 280   5                                      }
+ 281   4                                      case C_RF_DATA_1_KEY | C_RF_DATA_2_KEY | C_RF_DATA_4_KEY:
+ 282   4                                      {
+ 283   5                                              RF_KEY1_PIN = RF_KEY2_PIN = RF_KEY4_PIN = 1;
+ 284   5                                              RF_KEY3_PIN = 0;
+ 285   5                                              break;
+ 286   5                                      }
+ 287   4                                      case C_RF_DATA_1_KEY | C_RF_DATA_3_KEY | C_RF_DATA_4_KEY:
+ 288   4                                      {
+ 289   5                                              RF_KEY1_PIN = RF_KEY3_PIN = RF_KEY4_PIN = 1;
+ 290   5                                              RF_KEY2_PIN = 0;
+ 291   5                                              break;
+ 292   5                                      }
+ 293   4                                      //四个按键按下
+ 294   4                                      case C_RF_DATA_1_KEY | C_RF_DATA_2_KEY | C_RF_DATA_3_KEY | C_RF_DATA_4_KEY:
+ 295   4                                      {
+ 296   5                                              RF_KEY1_PIN = RF_KEY2_PIN = RF_KEY3_PIN = RF_KEY4_PIN = 1;
+ 297   5                                              break;
+ 298   5                                      }                               
+ 299   4                                      default:
+ 300   4                                      {
+ 301   5                                              RF_KEY1_PIN = RF_KEY2_PIN = RF_KEY3_PIN = RF_KEY4_PIN = 0;
+ 302   5                                              break;
+C51 COMPILER V9.00   APP_MAIN                                                              07/21/2020 16:23:55 PAGE 6   
+
+ 303   5                                      }
+ 304   4                              }
+ 305   3                              break;
+ 306   3                      }
+ 307   2                      /*点动 按下任意按键为高，保持1.5后为低*/
+ 308   2                      case DOT_TRG://点动             
+ 309   2                      {
+ 310   3                              switch(gst_RfRecData.uch_KeyNum)
+ 311   3                              {
+ 312   4                                      case C_RF_DATA_1_KEY: 
+ 313   4                                      { 
+ 314   5                                              RF_KEY1_PIN = 1;
+ 315   5                                              break; 
+ 316   5                                      } 
+ 317   4                                      case C_RF_DATA_2_KEY: 
+ 318   4                                      {  
+ 319   5                                              RF_KEY2_PIN = 1;
+ 320   5                                              break;
+ 321   5                                      } 
+ 322   4                                      case C_RF_DATA_3_KEY: 
+ 323   4                                      {         
+ 324   5                                              RF_KEY3_PIN = 1;
+ 325   5                                              break; 
+ 326   5                                      }
+ 327   4                                      case C_RF_DATA_4_KEY:
+ 328   4                                      {
+ 329   5                                              RF_KEY4_PIN = 1;
+ 330   5                                              break; 
+ 331   5                                      }
+ 332   4                                      default:
+ 333   4                                      {
+ 334   5                                              RF_KEY1_PIN = RF_KEY2_PIN = RF_KEY3_PIN = RF_KEY4_PIN = 0;
+ 335   5                                              break;
+ 336   5                                      }
+ 337   4                              }               
+ 338   3                              gst_SystemPara.ul_TimeCount = 0;//从按键按下开始算起，1.5s保持对应的端口输出
+ 339   3                              break;
+ 340   3                      }
+ 341   2                      /*互锁 每次只能有一个按键按下，这个按键为高，其他为低*/
+ 342   2                      case INTER_LOCK://互锁
+ 343   2                      {       
+ 344   3                              switch(gst_RfRecData.uch_KeyNum)
+ 345   3                              {
+ 346   4                                      case C_RF_DATA_1_KEY: 
+ 347   4                                      { 
+ 348   5                                              RF_KEY1_PIN = 1;
+ 349   5                                              RF_KEY2_PIN = RF_KEY3_PIN = RF_KEY4_PIN = 0;
+ 350   5                                              break; 
+ 351   5                                      } 
+ 352   4                                      case C_RF_DATA_2_KEY: 
+ 353   4                                      {  
+ 354   5                                              RF_KEY2_PIN = 1;
+ 355   5                                              RF_KEY1_PIN = RF_KEY3_PIN = RF_KEY4_PIN = 0;
+ 356   5                                              break;
+ 357   5                                      } 
+ 358   4                                      case C_RF_DATA_3_KEY: 
+ 359   4                                      {         
+ 360   5                                              RF_KEY3_PIN = 1;
+ 361   5                                              RF_KEY1_PIN = RF_KEY2_PIN = RF_KEY4_PIN = 0;
+ 362   5                                              break; 
+ 363   5                                      }
+ 364   4                                      case C_RF_DATA_4_KEY:
+C51 COMPILER V9.00   APP_MAIN                                                              07/21/2020 16:23:55 PAGE 7   
+
+ 365   4                                      {
+ 366   5                                              RF_KEY4_PIN = 1;
+ 367   5                                              RF_KEY1_PIN = RF_KEY2_PIN = RF_KEY3_PIN = 0;
+ 368   5                                              break; 
+ 369   5                                      }
+ 370   4                                      default:
+ 371   4                                      {
+ 372   5                                              RF_KEY1_PIN = RF_KEY2_PIN = RF_KEY3_PIN = RF_KEY4_PIN = 0;
+ 373   5                                              break;
+ 374   5                                      }
+ 375   4                              }
+ 376   3                              
+ 377   3                              break;
+ 378   3                      }
+ 379   2                      case UART_OUTPUT://串口输出
+ 380   2                      {
+ 381   3                              INT8U auch_Buff[7]={0x7B, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7D};
+ 382   3                              auch_Buff[1] = gst_RfRecData.ul_RemoteCtlAddr >> 16;
+ 383   3                              auch_Buff[2] = gst_RfRecData.ul_RemoteCtlAddr >> 8;
+ 384   3                              auch_Buff[3] = gst_RfRecData.ul_RemoteCtlAddr;
+ 385   3                              auch_Buff[4] = gst_RfRecData.uch_KeyNum;
+ 386   3                              auch_Buff[5] = Buff_Sum(auch_Buff, 5);
+ 387   3                              Uart_SendString(auch_Buff, sizeof(auch_Buff) / sizeof(auch_Buff[0]));
+ 388   3                              break;
+ 389   3                      }       
+ 390   2                      default:
+ 391   2                              break;
+ 392   2              }
+ 393   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    812    ----
+   CONSTANT SIZE    =     22    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----       8
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

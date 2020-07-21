@@ -1,0 +1,5 @@
+---- P32 Matches (4 in 4 files) ----
+App_GlobalValue.h (app):#define  RF_KEY3_PIN P32
+Bsp_Stc8gGpio.c (bsp):	P30 = P31 = P32 = P33 = 0;//³õÊ¼Îª0
+Mod_Button.h (mod):#define BUTTON_PIN P32//P55 //°´¼ü
+STC8Gxx.h (stc8g):sbit        P32         =           P3^2;

@@ -1,0 +1,49 @@
+C51 COMPILER V9.00   BSP_STC8GGPIO                                                         07/21/2020 16:23:55 PAGE 1   
+
+
+C51 COMPILER V9.00, COMPILATION OF MODULE BSP_STC8GGPIO
+OBJECT MODULE PLACED IN .\Objects\Bsp_Stc8gGpio.obj
+COMPILER INVOKED BY: d:\Keil_v5\C51\BIN\C51.EXE ..\BSP\Bsp_Stc8gGpio.c OPTIMIZE(8,SPEED) BROWSE INCDIR(..\APP;..\BSP;..\
+                    -PUB;..\STC8G;..\MOD) DEBUG OBJECTEXTEND PRINT(.\Listings\Bsp_Stc8gGpio.lst) OBJECT(.\Objects\Bsp_Stc8gGpio.obj)
+
+line level    source
+
+   1          #include "Bsp_Stc8gGpio.h"
+   2          /**
+   3           *************************************************************************
+   4           * @brief: Bsp_Stc8gGpio_Init
+   5           * @param: void
+   6           * @return: void
+   7           * @function:
+   8           * @author: 
+   9           * @version: V1.0
+  10           * @note:
+  11           *************************************************************************
+  12          **/
+  13          void Bsp_Stc8gGpio_Init(void)
+  14          {
+  15   1              P3M0 = 0x00; //设置 P3.0~P3.7 为双向口模式
+  16   1              P3M1 = 0x00;
+  17   1              
+  18   1              P5M0 = 0x00; //设置 P5.0~P5.7 为双向口模式
+  19   1              P5M1 = 0x00;
+  20   1              //P3M0 = 0xff; //设置 P3.0~P3.7 为开漏模式
+  21   1              //P3M1 = 0xff
+  22   1              P30 = P31 = P32 = P33 = 0;//初始为0
+  23   1      }
+  24          
+  25          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     18    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,209 @@
+C51 COMPILER V9.00   MOD_BUTTON                                                            07/21/2020 16:23:56 PAGE 1   
+
+
+C51 COMPILER V9.00, COMPILATION OF MODULE MOD_BUTTON
+OBJECT MODULE PLACED IN .\Objects\Mod_Button.obj
+COMPILER INVOKED BY: d:\Keil_v5\C51\BIN\C51.EXE ..\MOD\Mod_Button.c OPTIMIZE(8,SPEED) BROWSE INCDIR(..\APP;..\BSP;..\PUB
+                    -;..\STC8G;..\MOD) DEBUG OBJECTEXTEND PRINT(.\Listings\Mod_Button.lst) OBJECT(.\Objects\Mod_Button.obj)
+
+line level    source
+
+   1          #include "Mod_Button.h"
+   2          #include "App_GlobalValue.h"
+   3          #include "Bsp_Stc8gEeprom.h"
+   4          #include "Pub_Delay.h"
+   5          
+   6          /**
+   7           *************************************************************************
+   8           * @brief: Mod_Button_Init
+   9           * @param: void
+  10           * @return: void
+  11           * @function:
+  12           * @author: 
+  13           * @version: V1.0
+  14           * @note:
+  15           *************************************************************************
+  16          **/
+  17          void Mod_Button_Init(void)
+  18          {
+  19   1              BUTTON_PIN = 1;//读之前置高
+  20   1      }
+  21          /**
+  22           *************************************************************************
+  23           * @brief: Button_Read
+  24           * @param: void
+  25           * @return: void
+  26           * @function:
+  27           * @author: 
+  28           * @version: V1.0
+  29           * @note:
+  30           *************************************************************************
+  31          **/
+  32          static INT8U Button_Read(void)
+  33          {
+  34   1              if(BUTTON_PIN == 0)
+  35   1              {
+  36   2                      return BUTTON_PRESS;
+  37   2              }
+  38   1              else
+  39   1              {
+  40   2                      return NO_PRESS;
+  41   2              }
+  42   1              
+  43   1      }
+  44          /**
+  45           *************************************************************************
+  46           * @brief: Button_Scanf
+  47           * @param: void
+  48           * @return: 按键值
+  49           * @function:
+  50           * @author: 
+  51           * @version: V1.0
+  52           * @note:
+  53           *************************************************************************
+  54          **/
+C51 COMPILER V9.00   MOD_BUTTON                                                            07/21/2020 16:23:56 PAGE 2   
+
+  55          static INT8U Button_Scanf(void)
+  56          {
+  57   1              static INT8U _uch_State = 0; //按键初始化状态
+  58   1              static INT8U _uch_LastButton=0,_uch_NowButton=0; //记录两次电平的状态
+  59   1              INT8U _uch_ButtonValue=0;
+  60   1       
+  61   1              _uch_NowButton = Button_Read();//读按键值
+  62   1         
+  63   1              switch(_uch_State)
+  64   1              {
+  65   2                      case 0:
+  66   2                      {
+  67   3                              if(_uch_NowButton != _uch_LastButton)
+  68   3                              {                               
+  69   4                                      _uch_State = 1; //有按键按下
+  70   4                              }
+  71   3                              break;
+  72   3                      }
+  73   2                      case 1: 
+  74   2                      {
+  75   3                              if(_uch_NowButton == _uch_LastButton)
+  76   3                              {                               
+  77   4                                      _uch_State = 2; //消斗之后按键有效
+  78   4                              }
+  79   3                              else 
+  80   3                              {
+  81   4                                      _uch_State = 0; //认为误触
+  82   4                              }
+  83   3                              break;
+  84   3                      } 
+  85   2                      case 2: //消斗之后
+  86   2                      {
+  87   3                              if(_uch_NowButton == _uch_LastButton) //还是按下的状态 
+  88   3                              {
+  89   4                                      _uch_State = 3;
+  90   4                              }
+  91   3                              else//松开了，短按
+  92   3                              {
+  93   4                                      _uch_State = 0;                                 
+  94   4                                      _uch_ButtonValue = _uch_LastButton | BUTTON_SHORT;  //返回键值短按      
+  95   4                              }
+  96   3                              break;
+  97   3                      }
+  98   2                      
+  99   2                      case 3: //判断长按短按
+ 100   2                      {
+ 101   3                              if(_uch_NowButton == _uch_LastButton) 
+ 102   3                              {
+ 103   4                                  static INT16U cnt = 0;
+ 104   4                                      if(cnt++ > 500) //500*10ms = 5s
+ 105   4                                      {
+ 106   5                                              cnt = 0; 
+ 107   5                                              _uch_State = 4;
+ 108   5                                              _uch_ButtonValue = _uch_LastButton | BUTTON_LONG; //返回键值长按
+ 109   5                                      }                         
+ 110   4                              }
+ 111   3                              else
+ 112   3                              {
+ 113   4                                      _uch_State = 0;
+ 114   4                                      _uch_ButtonValue = _uch_LastButton | BUTTON_SHORT; //返回键值短按                       
+ 115   4                              }
+ 116   3                              break;
+C51 COMPILER V9.00   MOD_BUTTON                                                            07/21/2020 16:23:56 PAGE 3   
+
+ 117   3                      }
+ 118   2                      case 4://长按松手检测
+ 119   2                      {
+ 120   3                              if(_uch_NowButton != _uch_LastButton) 
+ 121   3                              {
+ 122   4                                      _uch_State = 0;
+ 123   4                              }
+ 124   3                              break;
+ 125   3                      }
+ 126   2              }//switch
+ 127   1              
+ 128   1              _uch_LastButton = _uch_NowButton; //更新
+ 129   1              return _uch_ButtonValue;
+ 130   1      }
+ 131          /**
+ 132           *************************************************************************
+ 133           * @brief: Button_Process
+ 134           * @param: void
+ 135           * @return: void
+ 136           * @function:
+ 137           * @author: 
+ 138           * @version: V1.0
+ 139           * @note:
+ 140           *************************************************************************
+ 141          **/
+ 142          void Button_Process(void)
+ 143          {
+ 144   1              INT8U _uch_ButtonNum;
+ 145   1              _uch_ButtonNum = Button_Scanf();//按键扫描
+ 146   1              if(_uch_ButtonNum == NO_BUTTON_PRESS)//没按键按下
+ 147   1              {
+ 148   2                      return;
+ 149   2              }
+ 150   1              if(_uch_ButtonNum & BUTTON_SHORT)//短按
+ 151   1              {
+ 152   2                      if(_uch_ButtonNum & BUTTON_PRESS)  
+ 153   2                      {
+ 154   3                              BUTTON_PIN = 0;//点亮LED灯
+ 155   3                              gst_SystemPara.uch_RemoteCtlTrgType++;//切换模式
+ 156   3                              gst_SystemPara.uch_RemoteCtlTrgType %= UART_OUTPUT + 1;//限制在翻转到串口输出之间
+ 157   3                              if(!SavePara_Eeprom(REMOTECTL_TYPE))//保存参数失败
+ 158   3                              {
+ 159   4                                      gst_SystemPara.uch_SystemStatus = ERROR;//错误模式
+ 160   4                                      return;
+ 161   4                              }
+ 162   3                              Delay_Ms(200);//短暂延时，看到灯熄灭切换成功
+ 163   3                              BUTTON_PIN = 1;//关闭LED灯
+ 164   3                      }       
+ 165   2              }
+ 166   1              else if(_uch_ButtonNum & BUTTON_LONG)//长按
+ 167   1              {
+ 168   2                      if(_uch_ButtonNum & BUTTON_PRESS)  
+ 169   2                      {
+ 170   3                              BUTTON_PIN = 0;//点亮LED灯
+ 171   3                              gst_RfRecData.ul_RemoteCtlAddr = 0;//清除接受到的遥控器ID
+ 172   3                              //在进入配置模式后，再按下遥控器才能保存地址
+ 173   3                              gst_SystemPara.uch_SystemStatus = CONFIG;//配置模式
+ 174   3                              gst_SystemPara.ul_TimeCount = 0;//配置时长开始计数
+ 175   3                              
+ 176   3                      }               
+ 177   2              }
+ 178   1              
+C51 COMPILER V9.00   MOD_BUTTON                                                            07/21/2020 16:23:56 PAGE 4   
+
+ 179   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    234    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      5       1
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,280 @@
+C51 COMPILER V9.00   BSP_STC8GEEPROM                                                       07/21/2020 16:23:56 PAGE 1   
+
+
+C51 COMPILER V9.00, COMPILATION OF MODULE BSP_STC8GEEPROM
+OBJECT MODULE PLACED IN .\Objects\Bsp_Stc8gEeprom.obj
+COMPILER INVOKED BY: d:\Keil_v5\C51\BIN\C51.EXE ..\BSP\Bsp_Stc8gEeprom.c OPTIMIZE(8,SPEED) BROWSE INCDIR(..\APP;..\BSP;.
+                    -.\PUB;..\STC8G;..\MOD) DEBUG OBJECTEXTEND PRINT(.\Listings\Bsp_Stc8gEeprom.lst) OBJECT(.\Objects\Bsp_Stc8gEeprom.obj)
+
+line level    source
+
+   1          #include "Bsp_Stc8gEeprom.h"
+   2          #include "Bsp_Stc8gUart.h"
+   3          #include "App_GlobalValue.h"
+   4          
+   5          void Bsp_Stc8gEeprom_Init(void)
+   6          {
+   7   1              IapEeprom_Idle();//空闲 
+   8   1      }
+   9          /**
+  10           *************************************************************************
+  11           * @brief: IapEeprom_Idle
+  12           * @param: void
+  13           * @return: void
+  14           * @function:
+  15           * @author: 
+  16           * @version: V1.0
+  17           * @note:
+  18           *************************************************************************
+  19          **/
+  20          void IapEeprom_Idle(void)
+  21          {
+  22   1              IAP_CONTR = 0; //关闭 IAP 功能
+  23   1              IAP_CMD = 0; //清除命令寄存器
+  24   1              IAP_TRIG = 0; //清除触发寄存器
+  25   1              IAP_ADDRH = 0x80; //将地址设置到非 IAP 区域
+  26   1              IAP_ADDRL = 0;
+  27   1      }
+  28          /**
+  29           *************************************************************************
+  30           * @brief: IapEeprom_Read
+  31           * @param: void
+  32           * @return: void
+  33           * @function:
+  34           * @author: 
+  35           * @version: V1.0
+  36           * @note:
+  37           *************************************************************************
+  38          **/
+  39          INT8U IapEeprom_Read(INT16U _uin_Addr)
+  40          {
+  41   1              INT8U _uch_Data;
+  42   1              IAP_CONTR = 0x80; //使能 IAP
+  43   1              IAP_TPS = 12; //设置擦除等待参数 12MHz
+  44   1              IAP_CMD = 1; //设置 IAP 读命令
+  45   1              IAP_ADDRL = _uin_Addr; //设置 IAP 低地址
+  46   1              IAP_ADDRH = _uin_Addr >> 8; //设置 IAP 高地址
+  47   1              IAP_TRIG = 0x5a; //写触发命令(0x5a)
+  48   1              IAP_TRIG = 0xa5; //写触发命令(0xa5)
+  49   1              _nop_();
+  50   1              _uch_Data = IAP_DATA; //读 IAP 数据
+  51   1              IapEeprom_Idle(); //关闭 IAP 功能
+  52   1              return _uch_Data;
+  53   1      }
+  54          /**
+C51 COMPILER V9.00   BSP_STC8GEEPROM                                                       07/21/2020 16:23:56 PAGE 2   
+
+  55           *************************************************************************
+  56           * @brief: IapEeprom_Program
+  57           * @param:  _uin_Addr -- 地址 _uch_Data -- 写入的数据
+  58           * @return: void
+  59           * @function:
+  60           * @author: 
+  61           * @version: V1.0
+  62           * @note:
+  63           *************************************************************************
+  64          **/
+  65          void IapEeprom_Program(INT16U _uin_Addr, INT8U _uch_Data)
+  66          {
+  67   1              IAP_CONTR = 0x80; //使能 IAP
+  68   1              IAP_TPS = 12; //设置擦除等待参数 12MHz
+  69   1              IAP_CMD = 2; //设置 IAP 写命令
+  70   1              IAP_ADDRL = _uin_Addr; //设置 IAP 低地址
+  71   1              IAP_ADDRH = _uin_Addr >> 8; //设置 IAP 高地址
+  72   1              IAP_DATA = _uch_Data; //写 IAP 数据
+  73   1              IAP_TRIG = 0x5a; //写触发命令(0x5a)
+  74   1              IAP_TRIG = 0xa5; //写触发命令(0xa5)
+  75   1              _nop_();
+  76   1              IapEeprom_Idle(); //关闭 IAP 功能
+  77   1      }
+  78          /**
+  79           *************************************************************************
+  80           * @brief: IapEeprom_Erase
+  81           * @param: _uin_Addr -- 地址
+  82           * @return: void
+  83           * @function:
+  84           * @author: 
+  85           * @version: V1.0
+  86           * @note:
+  87           *************************************************************************
+  88          **/
+  89          void IapEeprom_Erase(INT16U _uin_Addr)
+  90          {
+  91   1              IAP_CONTR = 0x80; //使能 IAP
+  92   1              IAP_TPS = 12; //设置擦除等待参数 12MHz
+  93   1              IAP_CMD = 3; //设置 IAP 擦除命令
+  94   1              IAP_ADDRL = _uin_Addr; //设置 IAP 低地址
+  95   1              IAP_ADDRH = _uin_Addr >> 8; //设置 IAP 高地址
+  96   1              IAP_TRIG = 0x5a; //写触发命令(0x5a)
+  97   1              IAP_TRIG = 0xa5; //写触发命令(0xa5)
+  98   1              _nop_(); //
+  99   1              IapEeprom_Idle(); //关闭 IAP 功能
+ 100   1      }
+ 101          /**
+ 102           *************************************************************************
+ 103           * @brief: Eeprom_Test
+ 104           * @param: void
+ 105           * @return: void
+ 106           * @function:
+ 107           * @author: 
+ 108           * @version: V1.0
+ 109           * @note:
+ 110           *************************************************************************
+ 111          **/
+ 112          void Eeprom_Test(void)
+ 113          {
+ 114   1              INT8U _auch_Read[2] = {0x00};
+ 115   1              INT8U _auch_Write[2] ={0x12, 0x21};
+ 116   1              /*
+C51 COMPILER V9.00   BSP_STC8GEEPROM                                                       07/21/2020 16:23:56 PAGE 3   
+
+ 117   1              IapEeprom_Erase(0x0400);
+ 118   1              _auch_Read[0] = IapEeprom_Read(TEST_ADDR); //P0=0xff
+ 119   1              //发送
+ 120   1              Uart_SendString("Erase Read =", 12);
+ 121   1              Uart_SendByte(_auch_Read[0]);
+ 122   1              Uart_SendString("\r\n", 2);
+ 123   1              IapEeprom_Program(TEST_ADDR, _auch_Write[0]);
+ 124   1              _auch_Read[0] = IapEeprom_Read(TEST_ADDR);
+ 125   1      
+ 126   1              //发送  
+ 127   1              Uart_SendString("Program Read =", 14);
+ 128   1              Uart_SendByte(_auch_Read[0]);
+ 129   1              Uart_SendString("\r\n", 2);     */
+ 130   1              //先读测试地址的数据
+ 131   1              _auch_Read[0] = IapEeprom_Read(TEST_ADDR);
+ 132   1              _auch_Read[1] = IapEeprom_Read(TEST_ADDR + 1);
+ 133   1              if((_auch_Read[0] == _auch_Write[0]) && (_auch_Read[1] == _auch_Write[1]))
+ 134   1              //读写一置认为EEPROM没坏
+ 135   1              {
+ 136   2                      return;
+ 137   2              }
+ 138   1              else
+ 139   1              {
+ 140   2                      //读写不一致，先擦除，再写
+ 141   2                      IapEeprom_Erase(TEST_ADDR);
+ 142   2                      IapEeprom_Erase(TEST_ADDR + 1);
+ 143   2                      IapEeprom_Program(TEST_ADDR, _auch_Write[0]);//写数据进去
+ 144   2                      IapEeprom_Program(TEST_ADDR + 1, _auch_Write[1]);
+ 145   2                      if((_auch_Read[0] != _auch_Write[0]) && (_auch_Read[1] != _auch_Write[1]))
+ 146   2                      //读写不一致
+ 147   2                      {
+ 148   3                              gst_SystemPara.uch_SystemStatus = ERROR;//系统错误
+ 149   3                      }
+ 150   2              }
+ 151   1      }       
+ 152          /**
+ 153           *************************************************************************
+ 154           * @brief: SavePara_Eeprom
+ 155           * @param: _uch_Type -- 写入的参数类型
+ 156           * @return: TRUE -- 成功 FLASE -- 失败
+ 157           * @function:
+ 158           * @author: 
+ 159           * @version: V1.0
+ 160           * @note:
+ 161           *************************************************************************
+ 162          **/
+ 163          BOOL SavePara_Eeprom(INT8U _uch_Type)
+ 164          {
+ 165   1              INT8U _auch_Addr[3] = {0x00};
+ 166   1              INT8U i;
+ 167   1              if(_uch_Type == REMOTECTL_ADDR)//保存类型为遥控器地址
+ 168   1              {
+ 169   2                      gst_SystemPara.uch_RemoteCtlSavedNum++;//存储下一个遥控器地址
+ 170   2                      gst_SystemPara.uch_RemoteCtlSavedNum %= MAX_REMOTE_NUM;//限制存储最大遥控数
+ 171   2                      i = gst_SystemPara.uch_RemoteCtlSavedNum;
+ 172   2                      
+ 173   2                      _auch_Addr[0] = gst_RfRecData.ul_RemoteCtlAddr;
+ 174   2                      _auch_Addr[1] = gst_RfRecData.ul_RemoteCtlAddr >> 8;
+ 175   2                      _auch_Addr[2] = gst_RfRecData.ul_RemoteCtlAddr >> 16;
+ 176   2                      //先擦除
+ 177   2                      IapEeprom_Erase(PARA_ADDR + i * 3 + 1);
+ 178   2                      IapEeprom_Erase(PARA_ADDR + i * 3 + 2);
+C51 COMPILER V9.00   BSP_STC8GEEPROM                                                       07/21/2020 16:23:56 PAGE 4   
+
+ 179   2                      IapEeprom_Erase(PARA_ADDR + i * 3 + 3);
+ 180   2                      //后写入
+ 181   2                      IapEeprom_Program(PARA_ADDR + i * 3 + 1, _auch_Addr[0]);
+ 182   2                      IapEeprom_Program(PARA_ADDR + i * 3 + 2, _auch_Addr[1]);
+ 183   2                      IapEeprom_Program(PARA_ADDR + i * 3 + 3, _auch_Addr[2]);
+ 184   2                      //读写一致，算写成功
+ 185   2                      if((IapEeprom_Read(PARA_ADDR + i * 3 + 1) == _auch_Addr[0])
+ 186   2                      && (IapEeprom_Read(PARA_ADDR + i * 3 + 2) == _auch_Addr[1])
+ 187   2                      && (IapEeprom_Read(PARA_ADDR + i * 3 + 3) == _auch_Addr[2]))
+ 188   2                      {
+ 189   3                              return TRUE;
+ 190   3                      }
+ 191   2                      else
+ 192   2                      {
+ 193   3                              return FALSE;
+ 194   3                      }
+ 195   2              }
+ 196   1              else if(_uch_Type == REMOTECTL_TYPE)//遥控器控制类型
+ 197   1              {
+ 198   2                      //先擦后写
+ 199   2                      IapEeprom_Erase(PARA_ADDR + MAX_REMOTE_NUM * 3 + 1);
+ 200   2                      IapEeprom_Program(PARA_ADDR + MAX_REMOTE_NUM * 3 + 1, gst_SystemPara.uch_RemoteCtlTrgType);
+ 201   2                      //再读与写做判断
+ 202   2                      if(IapEeprom_Read(PARA_ADDR + MAX_REMOTE_NUM * 3 + 1) == gst_SystemPara.uch_RemoteCtlTrgType)
+ 203   2                      //参数写入成功
+ 204   2                      {
+ 205   3                              return TRUE;
+ 206   3                      }
+ 207   2                      else
+ 208   2                      {
+ 209   3                              return FALSE;
+ 210   3                      }
+ 211   2              }
+ 212   1              else
+ 213   1              {
+ 214   2                      return FALSE;
+ 215   2              }
+ 216   1      
+ 217   1      }
+ 218          /**
+ 219           *************************************************************************
+ 220           * @brief: ReadPara_Eeprom
+ 221           * @param: void
+ 222           * @return: void
+ 223           * @function:
+ 224           * @author: 
+ 225           * @version: V1.0
+ 226           * @note:
+ 227           *************************************************************************
+ 228          **/
+ 229          void ReadPara_Eeprom(void)
+ 230          {
+ 231   1              INT8U _auch_Addr[3] = {0x00};
+ 232   1              INT8U i;        
+ 233   1              gst_SystemPara.uch_RemoteCtlSavedNum = IapEeprom_Read(PARA_ADDR);//从EEPROM读取系统参数
+ 234   1              gst_SystemPara.uch_RemoteCtlSavedNum %= MAX_REMOTE_NUM;//限制最大
+ 235   1              gst_SystemPara.uch_RemoteCtlTrgType = IapEeprom_Read(PARA_ADDR + MAX_REMOTE_NUM * 3 + 1);//遥控器输出模式
+ 236   1              gst_SystemPara.uch_RemoteCtlTrgType %= UART_OUTPUT + 1;//做参数有效检查
+ 237   1      
+ 238   1      
+ 239   1              for(i = 0; i < gst_SystemPara.uch_RemoteCtlSavedNum; i++)
+ 240   1              {
+C51 COMPILER V9.00   BSP_STC8GEEPROM                                                       07/21/2020 16:23:56 PAGE 5   
+
+ 241   2                      _auch_Addr[0] = IapEeprom_Read(PARA_ADDR + i * 3 + 1);//从EEPROM读取系统参数
+ 242   2                      _auch_Addr[1] = IapEeprom_Read(PARA_ADDR + i * 3 + 2);
+ 243   2                      _auch_Addr[2] = IapEeprom_Read(PARA_ADDR + i * 3 + 3);
+ 244   2                      gst_SystemPara.aul_RemoteCtlAddr[i] = ((INT32U)_auch_Addr[2] << 16) + ((INT32U)_auch_Addr[1] << 8) + _au
+             -ch_Addr[0];
+ 245   2              }
+ 246   1      }
+ 247          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    651    ----
+   CONSTANT SIZE    =     10    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----      12
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
